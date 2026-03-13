@@ -1,0 +1,66 @@
+const int PulsePin = A0;
+const int LED = LED_BUILTIN;
+
+int signal;
+int threshold = 130;
+
+unsigned long lastBeatTime = 0;
+unsigned long beatInterval = 0;
+
+const int MIN_IBI = 300;   // ms → 200 BPM max
+const int MAX_IBI = 1500;  // ms → 40 BPM min
+
+int bpmBuffer[4];
+int bpmIndex = 0;
+bool bufferFilled = false;
+
+bool aboveThreshold = false;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(LED, OUTPUT);
+}
+
+void loop() {
+  signal = analogRead(PulsePin);
+  unsigned long now = millis();
+
+  // Rising edge detect
+  if (signal > threshold && !aboveThreshold) { //: Nếu tín hiệu vượt ngưỡng và trước đó nó đang ở dưới ngưỡng đảm bảo một nhát đập chỉ được tính một lần.
+    aboveThreshold = true;
+
+    if (lastBeatTime > 0) {  //nếu lần cuối lớn hơn 0
+      beatInterval = now - lastBeatTime;      //Tính thời gian trôi qua kể từ lần đập cuối.
+
+      if (beatInterval >= MIN_IBI && beatInterval <= MAX_IBI) {
+        int bpm = 60000 / beatInterval;
+
+        bpmBuffer[bpmIndex++] = bpm;
+        if (bpmIndex >= 4) {
+          bpmIndex = 0;
+          bufferFilled = true;
+        }
+
+        if (bufferFilled) {
+          int sum = 0;
+          for (int i = 0; i < 4; i++) sum += bpmBuffer[i];
+          int avgBPM = sum / 4;
+
+          //Serial.print("BPM: ");
+          Serial.println(avgBPM);
+          digitalWrite(LED, HIGH);
+        }
+      }
+    }
+
+    lastBeatTime = now;
+  }
+
+  // Reset khi tín hiệu xuống
+  if (signal < threshold - 5) {
+    aboveThreshold = false;
+    digitalWrite(LED, LOW);
+  }
+
+  delay(5);
+}

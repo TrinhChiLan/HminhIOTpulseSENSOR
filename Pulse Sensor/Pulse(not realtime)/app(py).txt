@@ -1,0 +1,133 @@
+from flask import Flask, jsonify
+import serial
+import threading
+import time
+
+app = Flask(__name__)
+
+bpm_value = 0
+
+# mở serial
+try:
+    ser = serial.Serial('/dev/ttyACM0', 115200, timeout=0.1)
+    time.sleep(2)
+    ser.reset_input_buffer()
+    print("Serial connected")
+except Exception as e:
+    print("Serial error:", e)
+    ser = None
+
+
+# đọc dữ liệu Arduino
+def read_serial():
+    global bpm_value
+    while True:
+        if ser and ser.in_waiting:
+            try:
+                line = ser.readline().decode().strip()
+                bpm = int(line)
+                bpm_value = bpm
+                print("BPM:", bpm)
+            except:
+                pass
+        time.sleep(0.02)
+
+
+threading.Thread(target=read_serial, daemon=True).start()
+
+
+@app.route("/bpm")
+def bpm():
+    return jsonify({"bpm": bpm_value})
+
+
+@app.route("/")
+def home():
+    return """
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Heart Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body{
+background:#0f172a;
+color:white;
+font-family:sans-serif;
+text-align:center;
+padding:40px;
+}
+
+h1{color:#ff4757}
+
+#bpm{
+font-size:80px;
+font-weight:bold;
+color:#ff4757;
+}
+
+canvas{
+max-width:800px;
+margin:auto;
+}
+</style>
+</head>
+
+<body>
+
+<h1>PI Heart Monitor</h1>
+
+<div id="bpm">--</div>
+
+<canvas id="chart"></canvas>
+
+<script>
+
+const ctx = document.getElementById('chart').getContext('2d');
+
+const chart = new Chart(ctx,{
+type:'line',
+data:{
+labels:Array(20).fill(''),
+datasets:[{
+data:Array(20).fill(0),
+borderColor:'#ff4757',
+tension:0.4
+}]
+},
+options:{
+plugins:{legend:{display:false}},
+scales:{y:{min:40,max:150}}
+}
+});
+
+
+async function update(){
+
+let res = await fetch('/bpm')
+let data = await res.json()
+
+document.getElementById("bpm").innerText=data.bpm
+
+chart.data.datasets[0].data.push(data.bpm)
+
+if(chart.data.datasets[0].data.length>20)
+chart.data.datasets[0].data.shift()
+
+chart.update()
+
+}
+
+setInterval(update,1000)
+
+</script>
+
+</body>
+</html>
+"""
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, threaded=True)

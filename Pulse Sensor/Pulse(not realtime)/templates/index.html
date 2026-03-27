@@ -39,15 +39,47 @@
                 </div>
 
                 <div class="right-column">
-                    <div class="dashboard">
-                        <div class="metrics-card">
-                            <div class="metrics-label">Heart Rate</div>
-                            <div id="bpm">--</div>
-                            <div class="live-indicator">● LIVE</div>
+                    <div class="dashboard" id="dashboard-area">
+                        <div id="completion-banner" class="completion-banner" style="display:none;">
+                            <span>Reading Complete! Data saved. You may remove your finger.</span>
+                        </div>
+                        
+                        <div id="sensor-overlay" class="sensor-overlay">
+                            <div class="sensor-overlay-content">
+                                <h3 id="sensor-status-title">Waiting for Sensor...</h3>
+                                <p id="sensor-status-desc" style="color: #666;">Please place your finger on the sensor.</p>
+                                <div id="sensor-progress-bar" class="progress-bar-container" style="display:none;">
+                                    <div id="sensor-progress" class="progress-bar"></div>
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="chart-container">
-                            <canvas id="chart"></canvas>
+                        <div class="metrics-row">
+                            <div class="metrics-card">
+                                <div class="metrics-header">
+                                    <div class="metrics-label">Heart Rate</div>
+                                    <div class="live-indicator" id="live-indicator" style="display:none;">● LIVE</div>
+                                </div>
+                                <div class="metric-value"><span id="bpm">--</span></div>
+                            </div>
+
+                            <div class="metrics-card">
+                                <div class="metrics-header">
+                                    <div class="metrics-label">SpO2 Level</div>
+                                </div>
+                                <div class="metric-value"><span id="spo2">--</span><span class="unit">%</span></div>
+                            </div>
+                        </div>
+
+                        <div class="charts-column">
+                            <div class="chart-container">
+                                <div class="chart-title">Heart Rate (BPM)</div>
+                                <canvas id="chart"></canvas>
+                            </div>
+                            <div class="chart-container">
+                                <div class="chart-title">SpO2 Level (%)</div>
+                                <canvas id="spo2-chart"></canvas>
+                            </div>
                         </div>
                     </div>
                 </div>

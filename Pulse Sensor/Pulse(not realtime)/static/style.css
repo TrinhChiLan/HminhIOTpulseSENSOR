@@ -130,6 +130,62 @@ button:hover { background: #cc0000; }
     gap: 30px;
     margin: 0;
     max-width: none;
+    position: relative;
+}
+
+.sensor-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(4px);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 20px;
+}
+
+.sensor-overlay-content {
+    background: white;
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.sensor-overlay h3 { margin-top: 0; }
+
+.progress-bar-container {
+    width: 100%;
+    height: 10px;
+    background-color: #eee;
+    border-radius: 5px;
+    margin-top: 15px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background-color: #ff0000;
+    width: 0%;
+    transition: width 0.3s;
+}
+
+.metrics-row {
+    display: flex;
+    gap: 30px;
+}
+.metrics-row .metrics-card {
+    flex: 1;
+}
+
+.metrics-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
 }
 
 .metrics-card {
@@ -141,7 +197,7 @@ button:hover { background: #cc0000; }
     width: 100%;
     box-sizing: border-box;
     box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-    text-align: center;
+    text-align: left;
 }
 
 .live-indicator {
@@ -157,15 +213,22 @@ button:hover { background: #cc0000; }
 .metrics-label {
     font-size: 1rem;
     color: #666;
-    margin-bottom: 10px;
+    margin-bottom: 20px;
     text-transform: uppercase;
 }
 
-#bpm {
-    font-size: 80px;
+#bpm, #spo2 {
+    font-size: 60px;
     font-weight: 800;
     color: #000;
     line-height: 1;
+}
+
+.unit {
+    font-size: 20px;
+    color: #888;
+    font-weight: bold;
+    margin-left: 5px;
 }
 
 .chart-container {
@@ -177,6 +240,22 @@ button:hover { background: #cc0000; }
     width: 100%;
     box-sizing: border-box;
     max-width: none;
+}
+
+.charts-column {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 100%;
+}
+
+.chart-title {
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #666;
+    text-transform: uppercase;
+    font-size: 0.9rem;
+    text-align: left;
 }
 
 canvas {
@@ -210,8 +289,20 @@ canvas {
 }
 
 .history-item:last-child { border-bottom: none; }
-.history-item .bpm-val { font-weight: bold; color: #ff0000; }
+.history-item .bpm-val { font-weight: bold; color: #ff0000; text-align: left; }
 .history-item .time-val { color: #888; }
+
+.completion-banner {
+    background-color: #e0f2e9;
+    color: #1b6339;
+    border: 1px solid #bde6cf;
+    padding: 15px 20px;
+    border-radius: 10px;
+    font-weight: bold;
+    text-align: center;
+    width: 100%;
+    box-sizing: border-box;
+}
 
 /* Responsive adjustments */
 @media (max-width: 900px) {

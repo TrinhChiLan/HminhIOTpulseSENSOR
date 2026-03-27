@@ -1,0 +1,186 @@
+#include <Wire.h>
+#include "MAX30105.h"
+
+MAX30105 particleSensor;
+
+#define debug Serial
+
+// Heart rate
+unsigned long lastBeat = 0;
+int bpmArray[8] = {0};
+int bpmIndex = 0;
+
+// Finger detection + signal buffers
+const int SAMPLE_WINDOW = 50;  // 0.5 second at 100Hz
+long irBuffer[SAMPLE_WINDOW] = {0};
+long redBuffer[SAMPLE_WINDOW] = {0};
+int sampleIndex = 0;
+bool fingerPresent = false;
+int stableCount = 0;  // Count stable readings for warm-up
+
+// Output timing control
+unsigned long lastOutputTime = 0;
+const unsigned long OUTPUT_INTERVAL = 1000;  // Output result every 1 second
+const int STABLE_THRESHOLD = 150;  // ~1 second stabilization at 20ms/loop
+
+// Signal filtering
+float irDcLow = 0.0f;
+float prevIrAC = 0.0f;
+float prevIrAC2 = 0.0f;
+int fingerLostCount = 0;
+float spo2Smooth = 97.0f;
+
+void setup() {
+  debug.begin(115200);
+  debug.println("MAX30102 Initializing...");
+
+  if (!particleSensor.begin()) {
+    debug.println("ERROR: MAX30102 not found!");
+    while (1);
+  }
+
+  // Simple config: keep sample rate 100Hz, pulse width 411; increase ADC range for dynamic headroom
+  particleSensor.setup(0x1F, 4, 2, 100, 411, 16384);
+  particleSensor.setPulseAmplitudeRed(0x2A);   // Boost red LED
+  particleSensor.setPulseAmplitudeIR(0x3F);    // Boost IR LED (max safe)
+  particleSensor.setPulseAmplitudeGreen(0);
+
+  debug.println("Ready!");
+}
+
+void loop() {
+  long ir = particleSensor.getIR();
+  long red = particleSensor.getRed();
+
+  // Store sample in circular buffer
+  irBuffer[sampleIndex] = ir;
+  redBuffer[sampleIndex] = red;
+  sampleIndex = (sampleIndex + 1) % SAMPLE_WINDOW;
+
+  // Wait until buffer is full
+  static int warmCount = 0;
+  if (warmCount < SAMPLE_WINDOW) {
+    warmCount++;
+    delay(20);
+    return;
+  }
+
+  // Window stats
+  long irMin = LONG_MAX, irMax = LONG_MIN;
+  long redMin = LONG_MAX, redMax = LONG_MIN;
+  long irSum = 0, redSum = 0;
+
+  for (int i = 0; i < SAMPLE_WINDOW; i++) {
+    long iv = irBuffer[i];
+    long rv = redBuffer[i];
+    if (iv < irMin) irMin = iv;
+    if (iv > irMax) irMax = iv;
+    if (rv < redMin) redMin = rv;
+    if (rv > redMax) redMax = rv;
+    irSum += iv;
+    redSum += rv;
+  }
+
+  float irAvg = irSum / (float)SAMPLE_WINDOW;
+  float redAvg = redSum / (float)SAMPLE_WINDOW;
+  float irACp2p = irMax - irMin;
+  float redACp2p = redMax - redMin;
+
+  // Finger detection (tighter to avoid false reading when hand just removed)
+  const float IR_THRESHOLD = 13000;
+  const float RED_THRESHOLD = 8000;
+  const float AC_THRESHOLD = 220;
+  bool nowFinger = (irAvg > IR_THRESHOLD && redAvg > RED_THRESHOLD && irACp2p > AC_THRESHOLD && redACp2p > AC_THRESHOLD);
+
+  if (!nowFinger) {
+    fingerLostCount++;
+    if (fingerLostCount >= 5 && fingerPresent) {
+      debug.println("Finger removed");
+      fingerPresent = false;
+      bpmIndex = 0;
+      memset(bpmArray, 0, sizeof(bpmArray));
+      lastBeat = 0;
+      stableCount = 0;
+      spo2Smooth = 97.0f;
+      lastOutputTime = millis();
+    }
+    delay(20);
+    return;
+  }
+  fingerLostCount = 0;
+
+  if (!fingerPresent) {
+    debug.println("Finger detected");
+    fingerPresent = true;
+    bpmIndex = 0;
+    stableCount = 0;
+  }
+
+  // BPM detection on IR AC with hysteresis and state machine
+  float irAC = ir - irAvg;
+  float peakThreshold = constrain(irACp2p * 0.15f, 6.0f, 160.0f);
+  float releaseThreshold = peakThreshold * 0.4f;
+
+  static bool beatArmed = false;
+  int validBpm = 0;
+  float bpm = 0.0f;
+
+  unsigned long now = millis();
+  if (!beatArmed && irAC > peakThreshold && (now - lastBeat) > 250) {
+    // detected rising edge as beat
+    unsigned long delta = now - lastBeat;
+    if (delta < 2000 && lastBeat != 0) {
+      int instantBpm = (int)(60000.0f / delta);
+      bpmArray[bpmIndex % 8] = instantBpm;
+      bpmIndex++;
+    }
+    lastBeat = now;
+    beatArmed = true;
+  }
+
+  if (beatArmed && irAC < releaseThreshold) {
+    beatArmed = false;
+  }
+
+  if (bpmIndex > 0) {
+    int sum = 0;
+    int count = (bpmIndex < 8) ? bpmIndex : 8;
+    for (int i = 0; i < count; i++) sum += bpmArray[i];
+    bpm = (float)sum / count;
+    validBpm = 1;
+  }
+
+  // SpO2 using AC/DC ratio in window
+  float spo2 = spo2Smooth;
+  if (irACp2p > 200 && redACp2p > 200 && irAvg > 1200 && redAvg > 1200) {
+    float ratio = (redACp2p / redAvg) / (irACp2p / irAvg);
+    float spo2Calc = 110.0f - 25.0f * ratio;
+    spo2Calc = constrain(spo2Calc, 70.0f, 100.0f);
+    spo2Smooth = spo2Smooth * 0.85f + spo2Calc * 0.15f;
+    spo2 = spo2Smooth;
+    stableCount++;
+  } else {
+    if (irACp2p < 100 || redACp2p < 100) stableCount = 0;
+  }
+
+  if (stableCount < STABLE_THRESHOLD) {
+    debug.print("Stabilizing... ");
+    debug.print(stableCount);
+    debug.print("/");
+    debug.println(STABLE_THRESHOLD);
+    delay(20);
+    return;
+  }
+
+  // Output final values only once per OUTPUT_INTERVAL (1 second)
+  if (now - lastOutputTime >= OUTPUT_INTERVAL) {
+    lastOutputTime = now;
+    debug.print("BPM: ");
+    if (validBpm) debug.print((int)(bpm + 0.5f)); else debug.print("--");
+    debug.print("  SpO2: ");
+    debug.print(spo2, 1);
+    debug.println("%");
+  }
+
+  delay(20);
+}

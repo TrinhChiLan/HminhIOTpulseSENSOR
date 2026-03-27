@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Heart Monitor</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <link rel="stylesheet" href="../static/style.css">
+    </head>
+
+    <body>
+        <div id="login-overlay" class="overlay">
+            <div class="login-card">
+                <img src="../assets/logo.png" alt="Logo" class="login-logo">
+                <h2>Welcome</h2>
+                <p>Enter your phone number to start recording</p>
+                <input type="text" id="phone-input" placeholder="Phone Number (e.g. 0912345678)">
+                <button onclick="login()">Login / Start</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="layout-wrapper">
+                <div class="left-column">
+                    <div class="top-bar">
+                        <img src="../assets/logo.png" alt="Logo" class="main-logo">
+                        <div class="user-info">
+                            <span id="user-display">--</span>
+                            <button class="logout-btn" onclick="logout()">Logout</button>
+                        </div>
+                    </div>
+                    
+                    <div class="history-section">
+                        <h3>Recording History</h3>
+                        <div id="history-list" class="history-list">
+                            <p>Loading history...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="right-column">
+                    <div class="dashboard">
+                        <div class="metrics-card">
+                            <div class="metrics-label">Heart Rate</div>
+                            <div id="bpm">--</div>
+                            <div class="live-indicator">● LIVE</div>
+                        </div>
+
+                        <div class="chart-container">
+                            <canvas id="chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <script src="../static/script.js"></script>
+    </body>
+</html>
